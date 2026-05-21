@@ -1,0 +1,45 @@
+version: "3.9"
+
+services:
+
+  # ── Service base de données MySQL ──────────────────────────────
+  db:
+    image: mysql:8.0
+    container_name: tortiki_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    ports:
+      - "3307:3306"
+    volumes:
+      # Persistance des données entre les redémarrages
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      # Attend que MySQL soit vraiment prêt (pas juste démarré)
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 10s
+      retries: 5
+      interval: 5s
+
+  # ── Service application FastAPI ─────────────────────────────────
+  app:
+    build: .
+    container_name: tortiki_app
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "8000:8000"
+    volumes:
+      # Monte le code local dans le conteneur (reload automatique)
+      - .:/app
+    depends_on:
+      db:
+        # Attend que le healthcheck MySQL passe avant de démarrer
+        condition: service_healthy
+
+# ── Volume nommé pour la persistance MySQL ──────────────────────
+volumes:
+  mysql_data:
